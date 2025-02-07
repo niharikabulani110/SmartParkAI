@@ -1,0 +1,170 @@
+{% extends 'scanner/base.html' %}
+
+{% block content %}
+{% csrf_token %}
+<div class="status-container">
+    <h2>Smart Park AI</h2>
+    <div id="connection-status" class="status">
+        Connecting to video feed...
+    </div>
+    <div id="last-update" class="status">
+        Last Update: Never
+    </div>
+    <div id="frame-info" class="status">
+        Current Frame: 0 (FPS: -)
+    </div>
+</div>
+
+<div id="results">
+    <div class="analysis-container">
+        <div id="frame-display" class="frame-container">
+            <h3>Current Frame</h3>
+            <img id="analyzed-frame" src="" alt="No frame available" style="display: none;">
+        </div>
+        <div id="parking-spaces" class="results-container">
+            <p><strong>Available Parking Spaces:</strong> <span id="spaces-count">-</span></p>
+            <p><strong>Recommended Spots:</strong></p>
+            <ul id="spots-list">
+                <li>Waiting for analysis...</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<style>
+    .analysis-container {
+        display: flex;
+        gap: 20px;
+        margin-top: 20px;
+    }
+    .frame-container {
+        flex: 1;
+        padding: 15px;
+        background-color: white;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .results-container {
+        flex: 1;
+        padding: 15px;
+        background-color: white;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    #analyzed-frame {
+        max-width: 100%;
+        height: auto;
+        border-radius: 4px;
+    }
+</style>
+
+<style>
+    .status-container {
+        margin-bottom: 20px;
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+    }
+    .status {
+        margin: 10px 0;
+        padding: 8px;
+        background-color: white;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    #parking-spaces {
+        margin-top: 20px;
+        padding: 15px;
+        background-color: white;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .connected {
+        color: #28a745;
+    }
+    .disconnected {
+        color: #dc3545;
+    }
+</style>
+
+<script>
+    const videoPath = '{{ video_path }}';
+    let socket = null;
+
+    function connectWebSocket() {
+        // Create WebSocket connection
+        socket = new WebSocket(
+            'ws://' + window.location.host + '/ws/scanner/analysis/'
+        );
+
+        socket.onopen = function(e) {
+            document.getElementById('connection-status').innerHTML = 
+                '<span class="connected">Connected to video feed</span>';
+            
+            // Start the analysis
+            socket.send(JSON.stringify({
+                'type': 'start_analysis',
+                'video_path': videoPath
+            }));
+        };
+
+        socket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            if (data.type === 'analysis_update') {
+                updateResults(data);
+            }
+        };
+
+        socket.onclose = function(e) {
+            document.getElementById('connection-status').innerHTML = 
+                '<span class="disconnected">Disconnected from video feed</span>';
+            
+            // Try to reconnect after 5 seconds
+            setTimeout(function() {
+                connectWebSocket();
+            }, 5000);
+        };
+
+        socket.onerror = function(err) {
+            console.error('WebSocket error:', err);
+            document.getElementById('connection-status').innerHTML = 
+                '<span class="disconnected">Error connecting to video feed</span>';
+        };
+    }
+
+    function updateResults(data) {
+        // Update frame and FPS info
+        const frameCount = data.frame_count ? data.frame_count : 0;
+        const fps = data.fps ? data.fps : '-';
+        document.getElementById('frame-info').textContent = `Current Frame: ${frameCount} (FPS: ${fps})`;
+        
+        // Update spaces count
+        document.getElementById('spaces-count').textContent = data.available_spaces;
+        
+        // Update recommended spots
+        const spotsList = document.getElementById('spots-list');
+        spotsList.innerHTML = data.recommended_spots.length > 0 
+            ? data.recommended_spots.map(spot => `<li>${spot}</li>`).join('')
+            : '<li>No spots currently recommended</li>';
+        
+        // Update last update time
+        const now = new Date();
+        document.getElementById('last-update').textContent = 
+            `Last Update: ${now.toLocaleTimeString()}`;
+            
+        // Update the frame image
+        const frameImg = document.getElementById('analyzed-frame');
+        if (data.frame) {
+            frameImg.src = 'data:image/jpeg;base64,' + data.frame;
+            frameImg.style.display = 'block';
+        } else {
+            frameImg.style.display = 'none';
+        }
+    }
+
+    // Start WebSocket connection when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        connectWebSocket();
+    });
+</script>
+{% endblock %}

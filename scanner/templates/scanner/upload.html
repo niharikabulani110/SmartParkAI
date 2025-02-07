@@ -1,0 +1,49 @@
+{% extends 'scanner/base.html' %}
+
+{% block content %}
+<h1>Smart Park AI</h1>
+<p>Analyze parking lot CCTV footage for available spaces.</p>
+
+<div class="input-section">
+    <h3>Upload Video File</h3>
+    <form method="post" enctype="multipart/form-data" class="form-group">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="video">Select Video File:</label><br>
+            <input type="file" id="video" name="video" accept="video/*">
+        </div>
+        <button type="submit" class="btn">Upload & Analyze</button>
+    </form>
+</div>
+
+{% if error %}
+<div class="error-message">
+    {{ error }}
+</div>
+{% endif %}
+
+<style>
+    .input-section {
+        margin-bottom: 30px;
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+    }
+    .text-input {
+        width: 100%;
+        padding: 8px;
+        margin: 8px 0;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+    .error-message {
+        color: #dc3545;
+        padding: 10px;
+        margin-top: 15px;
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        border-radius: 4px;
+    }
+</style>
+{% endblock %}
